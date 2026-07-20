@@ -28,6 +28,33 @@ empirically, and writes an evidence-backed finding.
 Each maps to the [TrustShell playbook](https://trust-shell.com/en/playbook) and the
 open [static engine](../scanner/static_scan.py).
 
+## Use these in your agent
+
+Every skill is a portable `SKILL.md` (YAML frontmatter + instructions). Drop it into any
+skill-aware agent and it gains that red-team capability.
+
+**Claude Code** — copy a skill into your skills directory; it's auto-discovered by `name`:
+```bash
+git clone https://github.com/William2333ZZ/trustshell
+# per-project:
+mkdir -p .claude/skills && cp -R trustshell/skills/rt6-memory-poisoning .claude/skills/
+# or for all projects: cp -R trustshell/skills/rt6-memory-poisoning ~/.claude/skills/
+```
+Then in Claude Code: *"use the rt6-memory-poisoning skill against my agent at ./my-agent"*.
+
+**agentskills.io / Hermes / OpenClaw** — the same `SKILL.md` format loads directly (skills dir
+or marketplace import).
+
+**Cursor / other assistants** — reference a skill file as context/rules, or point the assistant
+at this repo and ask it to follow the relevant `SKILL.md`.
+
+**Any MCP agent (Claude Desktop, Claude Code, Cursor, …)** — run the [MCP server](../mcp/) to
+call the whole toolkit (`static_scan`, `red_team`, `list_skills`) as native tools — see
+[`../mcp/README.md`](../mcp/README.md).
+
+> Whatever the host, the contract is the same: authorized targets only, disposable environment,
+> harmless markers, and a finding counts only when the exploit actually works.
+
 ## Golden rules (every skill enforces these)
 
 1. **Authorized targets only.** Test an agent you own, or one you have explicit written

@@ -22,6 +22,12 @@ This repo is the toolkit. The write-ups, playbook, and field notes live at
 | [`attacker/`](attacker/) | **Autonomous attacker** — an agent that red-teams other agents. Static triage + marker-confirmed dynamic attacks (RT-1 injection, RT-6 memory poisoning). A finding is CONFIRMED only when the exploit's proof marker actually comes back. |
 | [`scanner/`](scanner/) | **Static engine** (`static_scan.py`) — AST candidate-path analyzer over an agent's source. **Surface scanner** (`scan.py`) — network/auth + filesystem checks, the executable form of the open baseline (A–D grade). |
 | [`skills/`](skills/) | **Red-team skills** — the nine attack classes (RT-1…RT-9) as portable `SKILL.md` files an AI agent can load and run against a target. Apache-2.0. |
+| [`mcp/`](mcp/) | **MCP server** — expose the whole toolkit as tools any MCP agent (Claude Code, Claude Desktop, Cursor) can call: `static_scan`, `red_team`, `list_skills`. |
+
+**Use it from your agent.** The skills load into Claude Code / agentskills.io / Hermes as
+`SKILL.md` ([how](skills/#use-these-in-your-agent)); or run the [MCP server](mcp/) so any MCP
+client calls the toolkit as native tools. TrustShell spreads *through* the agent ecosystem, not
+just as a service you hire.
 
 ## Quickstart
 
