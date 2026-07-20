@@ -1,0 +1,14 @@
+{
+  "name": "trustshell",
+  "description": "AI agent security for Claude Code — read the code, break the running agent, prove it (exploit-validated). Commands: /static-scan, /red-team. Subagent: agent-red-teamer. Skills: RT-1..RT-9.",
+  "version": "0.1.0",
+  "author": {
+    "name": "TrustShell",
+    "email": "a313295747@gmail.com",
+    "url": "https://trust-shell.com"
+  },
+  "homepage": "https://trust-shell.com",
+  "repository": "https://github.com/William2333ZZ/trustshell",
+  "license": "MIT",
+  "keywords": ["ai-agent-security", "red-team", "prompt-injection", "exploit-validated"]
+}

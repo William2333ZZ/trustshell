@@ -29,6 +29,26 @@ This repo is the toolkit. The write-ups, playbook, and field notes live at
 client calls the toolkit as native tools. TrustShell spreads *through* the agent ecosystem, not
 just as a service you hire.
 
+## Install as a Claude Code plugin
+
+One command turns this repo into `/static-scan`, `/red-team`, and the `agent-red-teamer` subagent
+inside Claude Code (the RT-1…RT-9 skills come with it):
+
+```
+/plugin marketplace add William2333ZZ/trustshell
+/plugin install trustshell
+```
+
+Then, in a throwaway sandbox with an agent you own or are authorized to test:
+
+```
+/static-scan ./path/to/agent-source          # triage: candidate vulnerable paths
+/red-team my-agent -m {msg}                   # attack the running agent; CONFIRM with a proof marker
+```
+
+or just ask: *"use the agent-red-teamer subagent to red-team my agent at ./my-agent."*
+Authorized, disposable-environment testing only — the attacker refuses without `--authorized`.
+
 ## Quickstart
 
 ```bash
