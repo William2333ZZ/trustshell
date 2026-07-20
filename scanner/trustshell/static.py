@@ -15,6 +15,8 @@ import ast
 import json
 import os
 import re
+import shutil
+import subprocess
 from dataclasses import dataclass, asdict
 
 
@@ -55,7 +57,7 @@ def _src_files(root: str, max_files=6000):
         if any(s in base for s in skip):
             continue
         for f in files:
-            if f.endswith((".py", ".js", ".ts", ".tsx", ".mjs")):
+            if f.endswith((".py", ".js", ".ts", ".tsx", ".jsx", ".mjs", ".cjs")):
                 yield os.path.join(base, f)
                 max_files -= 1
                 if max_files <= 0:
@@ -192,14 +194,59 @@ def _analyze_lines(path, relpath) -> list[Candidate]:
     return out
 
 
+# ── TS/JS: real AST via the Node analyzer (falls back to regex) ────────────
+_JS_EXT = (".js", ".ts", ".tsx", ".jsx", ".mjs", ".cjs")
+
+
+def _analyze_js_ast(root: str) -> list[Candidate] | None:
+    """Run the Node/TypeScript AST analyzer (scanner/js/analyze.mjs) over the whole tree.
+
+    Returns a list of candidates, or None when Node or the analyzer/its `typescript` dependency
+    is unavailable — so the caller can fall back to coarse line-regex and the Python core stays
+    zero-dependency.
+    """
+    node = shutil.which("node")
+    if not node:
+        return None
+    analyzer = os.path.join(os.path.dirname(__file__), "..", "js", "analyze.mjs")
+    if not os.path.exists(analyzer):
+        return None
+    try:
+        p = subprocess.run([node, analyzer, "--source", root, "--json"],
+                           capture_output=True, text=True, timeout=120)
+    except Exception:  # noqa: BLE001
+        return None
+    if p.returncode != 0 or not p.stdout.strip():
+        return None  # e.g. `typescript` not installed → fall back to regex
+    try:
+        data = json.loads(p.stdout)
+    except ValueError:
+        return None
+    return [
+        Candidate(c.get("rt", ""), c.get("severity", "med"), c.get("file", ""),
+                  int(c.get("line", 0)), c.get("why", ""), c.get("snippet", ""))
+        for c in data.get("candidates", [])
+    ]
+
+
 def analyze_source(root: str) -> list[Candidate]:
     out: list[Candidate] = []
+    js_files: list[str] = []
     for path in _src_files(root):
         rel = _rel(root, path)
         if path.endswith(".py"):
             out.extend(_analyze_python(path, rel))
         else:
-            out.extend(_analyze_lines(path, rel))
+            js_files.append(path)
+
+    if js_files:
+        js_cands = _analyze_js_ast(root)
+        if js_cands is None:                       # Node/typescript unavailable → coarse fallback
+            for path in js_files:
+                out.extend(_analyze_lines(path, _rel(root, path)))
+        else:
+            out.extend(js_cands)
+
     # stable sort: severity → RT → file
     order = {"crit": 0, "high": 1, "med": 2}
     out.sort(key=lambda c: (order.get(c.severity, 3), c.rt, c.file, c.line))

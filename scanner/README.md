@@ -55,6 +55,14 @@ python3 static_scan.py --source /path/to/agent --json
 whether the dynamic red-team's exploit actually works, not this match. Static says *where to look*,
 dynamic decides *what's real*. Zero dependencies, Python stdlib only.
 
+### Language coverage
+- **Python targets** → parsed with Python's `ast` (precise).
+- **TypeScript / JavaScript targets** → parsed with a real AST via the TypeScript compiler API
+  ([`js/`](js/)); the same RT-1…RT-9 triage quality Python targets get. `static_scan.py`
+  auto-detects Node and uses it; if Node or `typescript` is absent it falls back to coarse
+  line-regex, so the Python core stays zero-dependency. Enable the AST path with
+  `cd scanner/js && npm install`.
+
 Exit codes: `A→0`, `B/C→1`, `D→2` (for CI gating).
 
 ## Check coverage (v0.1)
