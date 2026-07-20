@@ -1,72 +1,89 @@
-# TrustShell Scanner · 端侧 Agent 安全扫描器
+# TrustShell Scanner · on-device agent security scanner
 
-> 《信壳开放基线 v0.1》的可执行版本。给你的自托管 / 端侧 AI Agent(OpenClaw、各类"龙虾"、WorkBuddy 类)做一次自动安全体检,输出 **A/B/C/D 评级**。
+> The executable form of the TrustShell Open Baseline v0.1. Runs an automated security check on
+> your self-hosted / on-device AI agent and outputs an **A/B/C/D grade**.
 >
-> **零依赖**,仅需 Python 3.8+。
+> **Zero dependencies** — Python 3.8+ only.
 
-## 这是什么
+## What this is
 
-端侧 Agent(跑在你自己机器/盒子上、握着你账号钥匙、能替你干真事的 AI)一旦没锁好,就是"数字管家裸奔":管理面挂公网、技能包带毒、凭证明文、出事查不清。本工具把《信壳开放基线》里**可自动检测**的检查项跑成一次扫描,当场给分。
+An on-device agent (an AI that runs on your own machine/box, holds your account keys, and can
+take real actions for you) is, if left unlocked, a "digital butler running exposed": management
+plane on the public internet, poisoned skills, plaintext credentials, no trail when something
+goes wrong. This tool runs the **auto-testable** items of the TrustShell Open Baseline as a single
+scan and grades on the spot.
 
-- 网络检查(`--target`):管理面是否只绑本机、有无裸露端口、TLS、调试端点、跨源劫持(DNS-rebinding)、敏感端点是否需鉴权。
-- 文件系统检查(`--path`):依赖锁文件、配置/日志里的明文凭证、是否有可取证的日志。
+- Network checks (`--target`): does the management plane bind localhost-only, any exposed ports,
+  TLS, debug endpoints, cross-origin hijack (DNS-rebinding), do sensitive endpoints require auth.
+- Filesystem checks (`--path`): dependency lockfiles, plaintext credentials in config/logs,
+  whether any forensic logs exist.
 
-评分遵循基线:**致命项一票否决**——任一致命项不过,直接判 D。
+Scoring follows the baseline: **critical items are a hard veto** — any failed critical item grades
+straight to D.
 
-## 快速开始
+## Quickstart
 
 ```bash
-# 网络体检(指向 Agent 的管理面地址)
+# Network check (point at the agent's management-plane address)
 python3 scan.py --target http://127.0.0.1:3000
 
-# 文件系统体检(指向 Agent 安装/工作目录)
+# Filesystem check (point at the agent's install/working directory)
 python3 scan.py --path /path/to/your-agent
 
-# 两者一起,拿到完整评级
+# Both, for a full grade
 python3 scan.py --target http://127.0.0.1:3000 --path /path/to/your-agent
 
-# 机器可读(接 CI / 生成红黑榜)
+# Machine-readable (CI / leaderboards)
 python3 scan.py --target http://127.0.0.1:3000 --json
 ```
 
-## 静态引擎 v0(动静互证的静态一侧)
+## Static engine v0
 
-`scan.py` 看的是**运行中/文件层**;`static_scan.py` 读的是**源码**——标出"候选"可疑路径(不可信内容流进危险落点、只靠签名的防护、缺失的检查),映射到攻击手册 RT-1…RT-9。
+`scan.py` looks at the **running / filesystem layer**; `static_scan.py` reads the **source** —
+flagging candidate vulnerable paths (untrusted content reaching a dangerous sink, signature-only
+guards, missing checks), mapped to the RT-1…RT-9 attack classes.
 
 ```bash
-# 读 Agent 源码,分诊候选路径
+# Read an agent's source, triage candidate paths
 python3 static_scan.py --source /path/to/agent
 
-# JSON(接动态红队 / CI)
+# JSON (feed the dynamic red-team / CI)
 python3 static_scan.py --source /path/to/agent --json
 ```
 
-**它是分诊,不是判决。** 候选 ≠ 漏洞;真假的裁判是动态红队"真打穿",不是这里的匹配。这正是**动静互证**:静态说"去哪儿打",动态判"什么真能利用"。零依赖,仅 Python 标准库。
+**This is triage, not a verdict.** A candidate is not a vulnerability; the arbiter of truth is
+whether the dynamic red-team's exploit actually works, not this match. Static says *where to look*,
+dynamic decides *what's real*. Zero dependencies, Python stdlib only.
 
-退出码:`A→0`,`B/C→1`,`D→2`(便于 CI 卡门)。
+Exit codes: `A→0`, `B/C→1`, `D→2` (for CI gating).
 
-## 检查项覆盖(v0.1)
+## Check coverage (v0.1)
 
-| 编号 | 检查 | 严重度 | 类型 |
+| ID | Check | Severity | Type |
 |---|---|---|---|
-| A-01 | 管理控制台默认只绑本机 | 致命 | 网络 |
-| A-02 | 无默认开放的公网端口 | 致命 | 网络 |
-| A-03 | 对外接口强制 TLS | 高 | 网络 |
-| A-04 | 生产关闭调试端口 | 高 | 网络 |
-| A-05 | 抵御 DNS-rebinding / 跨源 | 致命 | 网络 |
-| B-02 | 敏感端点需鉴权 | 致命 | 网络 |
-| C-04 | 依赖有完整性校验(锁文件) | 中 | 文件 |
-| E-01 | 凭证非明文存储 | 致命 | 文件 |
-| E-02 | 凭证不写入日志 | 高 | 文件 |
-| H-04 | 存在可导出的日志 | 中 | 文件 |
+| A-01 | Management console binds localhost-only by default | crit | network |
+| A-02 | No public ports open by default | crit | network |
+| A-03 | External interfaces enforce TLS | high | network |
+| A-04 | Debug ports disabled in production | high | network |
+| A-05 | Resists DNS-rebinding / cross-origin | crit | network |
+| B-02 | Sensitive endpoints require authentication | crit | network |
+| C-04 | Dependencies have integrity checks (lockfile) | med | file |
+| E-01 | Credentials not stored in plaintext | crit | file |
+| E-02 | Credentials not written to logs | high | file |
+| H-04 | Exportable logs exist | med | file |
 
-> 完整基线共 42 项(10 类);其余为需人工评估的手动项(注入鲁棒性、沙箱隔离、带外确认、审计防篡改等),见 [完整基线文档](https://…)。
+> The full baseline has 42 items (10 categories); the rest are manual items requiring human review
+> (injection robustness, sandbox isolation, out-of-band confirmation, tamper-evident audit, etc.).
 
-## 诚实的边界
+## Honest limits
 
-这是 **v0.1**,检查为启发式,可能漏报/误报;它覆盖的是"能自动测"的那部分,**不能替代完整的人工安全评估**。用途是:快速自查、给红黑榜打分、作为深度审计的入口。欢迎 issue / PR 一起把它做准。
+This is **v0.1** — checks are heuristic and may miss or over-flag; it covers the "auto-testable"
+subset and **is not a substitute for a full manual security assessment**. Use it for a fast
+self-check, to grade a leaderboard, or as the entry point to a deeper audit. Issues / PRs welcome
+to make it sharper.
 
-## 许可
+## License
 
-- 代码:MIT
-- 《信壳开放基线》标准文档:CC BY 4.0 —— 自由引用、共建,注明来源即可。
+- Code: MIT
+- The TrustShell Open Baseline standard document: CC BY 4.0 — free to cite and build on, with
+  attribution.

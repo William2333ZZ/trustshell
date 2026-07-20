@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""TrustShell 静态引擎 v0 —— 命令行入口(动静互证的静态一侧).
+"""TrustShell static engine v0 — command-line entry point.
 
-用法:
-  python3 static_scan.py --source /path/to/agent           # 分诊候选路径
-  python3 static_scan.py --source /path/to/agent --json     # JSON 输出
+Usage:
+  python3 static_scan.py --source /path/to/agent           # triage candidate paths
+  python3 static_scan.py --source /path/to/agent --json     # JSON output
 
-它标出**候选**可疑路径,交给动态红队证实/证伪。候选 ≠ 漏洞。
-零依赖(仅 Python 标准库)。
+Flags CANDIDATE vulnerable paths for the dynamic red-team to confirm/refute. Candidate != vuln.
+Zero dependencies (Python stdlib only).
 """
 from __future__ import annotations
 
@@ -21,16 +21,17 @@ def _c(code, s, on):
     return f"\033[{code}m{s}\033[0m" if on else s
 
 
-SEV_STYLE = {"crit": ("31", "致命"), "high": ("33", "高"), "med": ("90", "中")}
+SEV_STYLE = {"crit": ("31", "CRIT"), "high": ("33", "HIGH"), "med": ("90", "MED")}
 
 
 def print_report(cands, root, color):
     print()
-    print(_c("1", f"  TrustShell 静态引擎 v0 · 动静互证(静态侧)", color))
-    print(f"  源码: {root}")
+    print(_c("1", f"  TrustShell static engine v0 · candidate-path triage", color))
+    print(f"  source: {root}")
     print("  " + "─" * 58)
     if not cands:
-        print("  未发现候选可疑路径(不代表安全 —— 静态只看得到一部分,仍需动态红队)。")
+        print("  No candidate paths found (not proof of safety — static sees only part of the")
+        print("  picture; a dynamic red-team is still needed).")
         print()
         return
 
@@ -38,7 +39,7 @@ def print_report(cands, root, color):
     for c in cands:
         if c.rt != last_rt:
             label = S.RT_LABEL.get(c.rt, c.rt)
-            print(f"\n  【{c.rt}】{label}")
+            print(f"\n  [{c.rt}] {label}")
             last_rt = c.rt
         code, lab = SEV_STYLE.get(c.severity, ("90", c.severity))
         tag = _c(code, f"[{lab}]", color)
@@ -49,17 +50,17 @@ def print_report(cands, root, color):
 
     print("\n  " + "─" * 58)
     n = len(cands)
-    print(f"  候选路径: {n} 处 —— 这是分诊,不是判决。")
-    print(_c("36", "  下一步:动态红队对运行中的 Agent 逐条证实/证伪(动静互证)。", color))
-    print(_c("90", "  候选 ≠ 漏洞;真假的裁判是‘真打穿’,不是这里的匹配。", color))
+    print(f"  {n} candidate path(s) — this is triage, not a verdict.")
+    print(_c("36", "  Next: dynamically red-team the running agent to confirm/refute each one.", color))
+    print(_c("90", "  Candidate != vulnerability; the arbiter is a real exploit, not this match.", color))
     print()
 
 
 def main(argv=None):
-    ap = argparse.ArgumentParser(description="TrustShell 静态引擎 v0(动静互证静态侧)")
-    ap.add_argument("--source", required=True, help="Agent 源码目录")
-    ap.add_argument("--json", action="store_true", help="以 JSON 输出")
-    ap.add_argument("--no-color", action="store_true", help="关闭彩色")
+    ap = argparse.ArgumentParser(description="TrustShell static engine v0 — candidate-path triage")
+    ap.add_argument("--source", required=True, help="agent source directory")
+    ap.add_argument("--json", action="store_true", help="output JSON")
+    ap.add_argument("--no-color", action="store_true", help="disable color")
     args = ap.parse_args(argv)
 
     cands = S.analyze_source(args.source)
@@ -70,7 +71,7 @@ def main(argv=None):
         color = sys.stdout.isatty() and not args.no_color
         print_report(cands, args.source, color)
 
-    # 退出码:有候选 → 1(便于 CI 提示人工/动态复核),无候选 → 0
+    # exit code: candidates found → 1 (lets CI flag for manual/dynamic review), none → 0
     return 1 if cands else 0
 
 

@@ -1,9 +1,9 @@
-"""评分模型 —— 与《信壳开放基线 v0.1》一致。
+"""Scoring model — consistent with the TrustShell Open Baseline v0.1.
 
-- 权重:致命 CRIT=5, 高 HIGH=3, 中 MED=1
-- 加权通过率 = Σ(通过项权重) / Σ(已判定项权重),仅计 pass/fail(skip 不计)
-- 一票否决:任一致命项 fail → 直接 D
-- 分档:致命全过且 加权≥90% → A;≥75% → B;≥60% → C;否则 D
+- Weights: CRIT=5, HIGH=3, MED=1
+- Weighted pass rate = Σ(weight of passing items) / Σ(weight of decided items); pass/fail only (skip excluded)
+- Hard veto: any critical item fails → straight D
+- Bands: all criticals pass and weighted ≥90% → A; ≥75% → B; ≥60% → C; else D
 """
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ WEIGHT = {"crit": 5, "high": 3, "med": 1}
 
 
 def grade(findings):
-    """findings: [(Check, Result), ...] → dict 结果。"""
+    """findings: [(Check, Result), ...] → result dict."""
     scored = [(c, r) for c, r in findings if r.status in ("pass", "fail")]
     crit_fail = [c for c, r in findings if c.severity == "crit" and r.status == "fail"]
 
@@ -45,8 +45,8 @@ def grade(findings):
 
 
 GRADE_BLURB = {
-    "A": "可信,具备可承保/合规前提",
-    "B": "基本可靠,有待改进项",
-    "C": "及格线,存在明显短板",
-    "D": "裸奔或有致命项未过,应上黑榜",
+    "A": "trustworthy — meets the bar for insurability / compliance",
+    "B": "broadly reliable, with items to improve",
+    "C": "passing, with clear gaps",
+    "D": "exposed or a critical item failed — should be flagged",
 }

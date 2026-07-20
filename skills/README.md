@@ -23,6 +23,7 @@ empirically, and writes an evidence-backed finding.
 | [`rt6-memory-poisoning`](rt6-memory-poisoning/SKILL.md) | RT-6 | Does an injection persist into memory and fire in future sessions? |
 | [`rt7-supply-chain`](rt7-supply-chain/SKILL.md) | RT-7 | Can a poisoned skill / MCP / dependency become trusted instruction? |
 | [`rt8-data-exfiltration`](rt8-data-exfiltration/SKILL.md) | RT-8 | Can an injection move secrets/PII to an attacker sink? |
+| [`rt9-multi-agent`](rt9-multi-agent/SKILL.md) | RT-9 | Can one agent inject/escalate into another across a handoff or trust-launder relayed content? |
 | [`crossval-harness`](crossval-harness/SKILL.md) | method | Orchestrate static triage → dynamic confirmation (exploit-validated). |
 
 Each maps to the [TrustShell playbook](https://trust-shell.com/en/playbook) and the

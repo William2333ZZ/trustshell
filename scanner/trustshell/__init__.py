@@ -1,7 +1,7 @@
-"""TrustShell Open Baseline scanner — 端侧 Agent 安全自动检测.
+"""TrustShell Open Baseline scanner — automated on-device agent security checks.
 
-零依赖(仅标准库)。把《信壳开放基线 v0.1》里标注"可自动"的检查项,
-变成一次可运行的扫描 + 评分(A/B/C/D)。
+Zero dependencies (stdlib only). Turns the "auto-testable" items of the TrustShell Open
+Baseline v0.1 into a single runnable scan + grade (A/B/C/D).
 """
 
 __version__ = "0.1.0"

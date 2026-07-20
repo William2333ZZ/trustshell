@@ -1,12 +1,13 @@
-"""TrustShell 静态引擎 v0 —— Agent 源码"可疑路径"分级(动静互证的静态一侧).
+"""TrustShell static engine v0 — triage an agent's SOURCE for candidate vulnerable paths.
 
-设计原则(诚实第一):
-  这不是"判决器",是"分诊器"。它标出**候选**可疑路径——不可信内容可能
-  流进危险落点、只靠签名的防护、缺失的检查——交给动态红队去**证实或证伪**。
-  一个候选不等于一个漏洞;真假的裁判是"真打穿",不是这里的匹配。
+Design principle (honest first):
+  This is a triage tool, not a verdict engine. It flags CANDIDATE paths — untrusted content
+  that may reach a dangerous sink, signature-only guards, missing checks — for the dynamic
+  red-team to CONFIRM or REFUTE. A candidate is not a vulnerability; the arbiter of truth is
+  whether the exploit actually works, not this match.
 
-零依赖(仅标准库)。Python 文件走 AST(准),其它文件走行级正则(粗)。
-映射到攻击手册 RT-1…RT-9。
+Zero dependencies (stdlib only). Python files go through the AST (precise); other files use
+line-level regex (coarse). Findings map to the RT-1…RT-9 attack classes.
 """
 from __future__ import annotations
 
@@ -27,18 +28,18 @@ class Candidate:
     snippet: str
 
 
-# ── RT 分类说明(用于报告表头)────────────────────────────────────────────
+# ── RT class labels (report headers) ──────────────────────────────────────
 RT_LABEL = {
-    "RT-1": "提示词注入 / prompt injection",
-    "RT-2": "工具 / 动作滥用",
-    "RT-3": "沙箱 / 隔离逃逸",
-    "RT-6": "记忆 / 上下文投毒",
-    "RT-7": "供应链(技能/插件/依赖)",
-    "RT-8": "数据外泄 / 凭证",
-    "RT-GUARD": "仅签名防护(易被绕过)",
+    "RT-1": "Prompt injection",
+    "RT-2": "Tool / action abuse",
+    "RT-3": "Sandbox / isolation escape",
+    "RT-6": "Memory / context poisoning",
+    "RT-7": "Supply chain (skill / plugin / dependency)",
+    "RT-8": "Data exfiltration / credentials",
+    "RT-GUARD": "Signature-only guard (bypassable)",
 }
 
-# ── 危险落点(sink)与信号 ─────────────────────────────────────────────────
+# ── Dangerous sinks & signals ─────────────────────────────────────────────
 _EXEC_CALLS = {"system", "popen", "spawn", "spawnl", "spawnv", "call", "run", "check_output", "check_call", "Popen"}
 _EXEC_MODULES = {"os", "subprocess", "commands", "pty"}
 _DYNIMPORT = {"__import__", "import_module"}
@@ -68,13 +69,13 @@ def _rel(root, path):
         return path
 
 
-# ── Python: AST 分析 ─────────────────────────────────────────────────────
+# ── Python: AST analysis ──────────────────────────────────────────────────
 class _PyVisitor(ast.NodeVisitor):
     def __init__(self, relpath, lines):
         self.relpath = relpath
         self.lines = lines
         self.out: list[Candidate] = []
-        # 记录函数名,用于识别"记忆写入""签名过滤"这类函数
+        # track function names to spot "memory write" / "signature filter" functions
         self._func_writes_memory = False
 
     def _snip(self, lineno):
@@ -88,20 +89,20 @@ class _PyVisitor(ast.NodeVisitor):
         name = _call_name(node.func)
         dotted = _dotted(node.func)
 
-        # RT-3 / RT-2: 未沙箱执行
+        # RT-3 / RT-2: un-sandboxed execution
         if name in _EXEC_CALLS and any(m in dotted for m in _EXEC_MODULES):
             sev = "crit" if _has_kw(node, "shell", True) else "high"
-            self._add("RT-3", sev, node, f"命令执行 {dotted}() —— 候选:工具是否在无隔离环境跑?动态验证沙箱是否生效")
+            self._add("RT-3", sev, node, f"command execution {dotted}() — candidate: do tools run un-isolated? confirm the sandbox dynamically")
         if name in ("eval", "exec"):
-            self._add("RT-3", "crit", node, f"{name}() 动态执行 —— 候选:被执行内容是否可被不可信输入影响?")
+            self._add("RT-3", "crit", node, f"{name}() dynamic execution — candidate: can the executed content be influenced by untrusted input?")
 
-        # RT-7: 动态导入 / 下载执行
+        # RT-7: dynamic import / download-and-run
         if name in _DYNIMPORT:
-            self._add("RT-7", "high", node, "动态导入 —— 候选:导入名是否来自外部/技能市场(供应链)?")
+            self._add("RT-7", "high", node, "dynamic import — candidate: does the import name come from an external source / skill marketplace (supply chain)?")
 
-        # RT-8: 打印/记录疑似凭证
+        # RT-8: printing / logging suspected credentials
         if name in ("print", "info", "debug", "warning", "log") and _args_hint(node, _SECRET_HINTS):
-            self._add("RT-8", "high", node, "疑似把凭证/环境变量写入日志/输出 —— 候选:数据外泄")
+            self._add("RT-8", "high", node, "suspected credential/env var written to a log/output — candidate: data exfiltration")
 
         self.generic_visit(node)
 
@@ -109,17 +110,17 @@ class _PyVisitor(ast.NodeVisitor):
         lname = node.name.lower()
         body_src = " ".join(self.lines[node.lineno - 1: (node.end_lineno or node.lineno)]).lower()
 
-        # RT-6: 写入持久记忆的函数
+        # RT-6: functions that write into persistent memory
         if any(h in lname for h in ("memory", "remember", "curate", "persist", "profile")) and (".write" in body_src or "write_text" in body_src or "open(" in body_src or "_write" in body_src):
-            self._add("RT-6", "crit", node, f"函数 {node.name}() 疑似把内容写入持久记忆 —— 候选:是否对来源做信任/来源校验(memory poisoning)?")
+            self._add("RT-6", "crit", node, f"function {node.name}() appears to write content into persistent memory — candidate: is the source trusted / provenance-checked (memory poisoning)?")
 
-        # RT-GUARD: 仅靠签名/关键词列表的过滤
+        # RT-GUARD: signature / keyword-list only filtering
         if any(h in lname for h in ("filter", "sanitiz", "scan", "guard", "block", "threat", "detect")) and any(k in body_src for k in ("re.search", "re.match", "pattern", "blocklist", "keyword", "in content", "for pat")):
-            self._add("RT-GUARD", "high", node, f"函数 {node.name}() 疑似基于签名/关键词做拦截 —— 候选:语义型注入(伪装成正常内容)可能绕过")
+            self._add("RT-GUARD", "high", node, f"function {node.name}() appears to block by signature/keyword — candidate: a semantic injection (disguised as benign content) may bypass it")
 
-        # RT-1: 把外部内容拼进 prompt
+        # RT-1: external content concatenated into a prompt
         if any(h in lname for h in ("prompt", "system", "instruction")) and any(u in body_src for u in _UNTRUSTED_HINTS):
-            self._add("RT-1", "high", node, f"函数 {node.name}() 疑似把外部内容拼进提示/指令 —— 候选:提示词注入")
+            self._add("RT-1", "high", node, f"function {node.name}() appears to concatenate external content into a prompt/instruction — candidate: prompt injection")
 
         self.generic_visit(node)
 
@@ -169,12 +170,12 @@ def _analyze_python(path, relpath) -> list[Candidate]:
     return v.out
 
 
-# ── 非 Python:行级正则(粗)─────────────────────────────────────────────
+# ── Non-Python: line-level regex (coarse) ─────────────────────────────────
 _LINE_RULES = [
-    ("RT-3", "high", re.compile(r"child_process|exec\(|execSync|spawn\("), "命令执行 —— 候选:未沙箱执行"),
-    ("RT-3", "crit", re.compile(r"\beval\("), "eval() —— 候选:动态执行不可信内容"),
-    ("RT-8", "high", re.compile(r"(?i)console\.(log|info)\([^)]*(api[_-]?key|token|secret|password)"), "疑似把凭证写入日志 —— 候选:外泄"),
-    ("RT-6", "high", re.compile(r"(?i)(USER\.md|MEMORY\.md|/memories/)"), "触及持久记忆文件 —— 候选:memory poisoning"),
+    ("RT-3", "high", re.compile(r"child_process|exec\(|execSync|spawn\("), "command execution — candidate: un-sandboxed execution"),
+    ("RT-3", "crit", re.compile(r"\beval\("), "eval() — candidate: dynamic execution of untrusted content"),
+    ("RT-8", "high", re.compile(r"(?i)console\.(log|info)\([^)]*(api[_-]?key|token|secret|password)"), "suspected credential written to a log — candidate: exfiltration"),
+    ("RT-6", "high", re.compile(r"(?i)(USER\.md|MEMORY\.md|/memories/)"), "touches a persistent-memory file — candidate: memory poisoning"),
 ]
 
 
@@ -199,7 +200,7 @@ def analyze_source(root: str) -> list[Candidate]:
             out.extend(_analyze_python(path, rel))
         else:
             out.extend(_analyze_lines(path, rel))
-    # 稳定排序:严重度 → RT → 文件
+    # stable sort: severity → RT → file
     order = {"crit": 0, "high": 1, "med": 2}
     out.sort(key=lambda c: (order.get(c.severity, 3), c.rt, c.file, c.line))
     return out
@@ -208,7 +209,7 @@ def analyze_source(root: str) -> list[Candidate]:
 def to_dict(cands: list[Candidate], root: str) -> dict:
     return {
         "engine": "TrustShell static v0",
-        "note": "候选路径(triage),需动态红队证实/证伪。候选≠漏洞。",
+        "note": "candidate paths (triage) — dynamic red-team must confirm/refute. candidate != vulnerability.",
         "source": root,
         "count": len(cands),
         "candidates": [asdict(c) for c in cands],
