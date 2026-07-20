@@ -16,6 +16,7 @@ empirically, and writes an evidence-backed finding.
 | Skill | Class | Tests |
 |---|---|---|
 | [**`redteam-an-agent`**](redteam-an-agent/SKILL.md) | **method (start here)** | The end-to-end real process: recon the target's own code → disposable harness → prove/refute each weakness through a real attacker-reachable entry point. The discipline that makes a finding credible. |
+| [**`audit-agent-code`**](audit-agent-code/SKILL.md) | **method (framework layer)** | When the LLM layer is hardened, break the agent through its own framework code: classic appsec (path traversal, command injection, fail-open sandbox, late auth) at the untrusted-input boundaries the model never sees. |
 | [`rt1-prompt-injection`](rt1-prompt-injection/SKILL.md) | RT-1 | Does content the agent processes hijack its task? |
 | [`rt2-tool-abuse`](rt2-tool-abuse/SKILL.md) | RT-2 | Can it be coerced into an unintended tool call / confused deputy? |
 | [`rt3-sandbox-escape`](rt3-sandbox-escape/SKILL.md) | RT-3 | Do tools run un-isolated? Does the sandbox silently disable? |

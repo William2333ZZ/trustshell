@@ -21,6 +21,9 @@ a buyer, integrator, or insurer can act on is one whose author says "actually, n
 the verdicts, and the write-ups live at [trust-shell.com](https://trust-shell.com).
 
 ## Field notes
+- [Three well-defended agents. Three layers. Three ways in.](field-notes/three-agents-three-layers.md) —
+  three serious self-hosted agents broken at three different layers (LLM behavior, framework code,
+  deployment isolation), each labeled by verification status. Targets anonymized.
 - [The scanner said safe. The exploit disagreed.](field-notes/owasp-agentic-skills-in-practice.md) —
   OWASP Agentic Skills Top 10 in practice: two confirmed findings, and the two times we corrected our
   own. Exploit-validated, target anonymized.
