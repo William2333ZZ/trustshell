@@ -31,7 +31,7 @@ the verdicts, and the write-ups live at [trust-shell.com](https://trust-shell.co
 |---|---|
 | [`attacker/`](attacker/) | **Autonomous attacker** — an agent that red-teams other agents. Static triage + marker-confirmed dynamic attacks (RT-1 injection, RT-6 memory poisoning). A finding is CONFIRMED only when the exploit's proof marker actually comes back. |
 | [`scanner/`](scanner/) | **Static engine** (`static_scan.py`) — AST candidate-path analyzer over an agent's source: Python targets via Python's `ast`, TypeScript/JavaScript targets via the TS compiler API ([`scanner/js/`](scanner/js/)). **Surface scanner** (`scan.py`) — network/auth + filesystem checks, the executable form of the open baseline (A–D grade). |
-| [`skills/`](skills/) | **Red-team skills** — the nine attack classes (RT-1…RT-9) as portable `SKILL.md` files an AI agent can load and run against a target. Apache-2.0. |
+| [`skills/`](skills/) | **The method, as skills.** [`redteam-an-agent`](skills/redteam-an-agent/SKILL.md) is the end-to-end process we run (recon → disposable harness → prove/refute via a real attacker-reachable entry point), plus the RT-1…RT-9 attack classes. Portable `SKILL.md` — load them into your own agent. The [field notes](#field-notes) are the proof these skills break real agents. Apache-2.0. |
 | [`mcp/`](mcp/) | **MCP server** — expose the whole toolkit as tools any MCP agent (Claude Code, Claude Desktop, Cursor) can call: `static_scan`, `red_team`, `list_skills`. |
 
 **Use it from your agent.** The skills load into Claude Code / agentskills.io / Hermes as
