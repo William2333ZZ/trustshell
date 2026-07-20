@@ -1,6 +1,6 @@
 <h1 align="center">TrustShell</h1>
-<p align="center"><b>An open-source toolkit for AI agent security.</b><br>
-Read the code, break the running agent, prove it — exploit-validated, not guessed.</p>
+<p align="center"><b>Independent, exploit-validated security review for AI agents.</b><br>
+Read the code, break the running agent, prove it — then say honestly what broke and what held.</p>
 <p align="center">
   🔗 <a href="https://trust-shell.com">trust-shell.com</a> · ✉️ a313295747@gmail.com · Zero dependencies (Python 3.8+)
 </p>
@@ -8,12 +8,22 @@ Read the code, break the running agent, prove it — exploit-validated, not gues
 ---
 
 Every AI agent that can *act* is a new attack surface, and automated scans only catch the easy
-layer. The real risk — prompt injection, memory poisoning, sandbox escape, tool/action abuse —
-needs an adversary. TrustShell combines **static + dynamic** testing (like SAST + DAST for AI
-agents), and **the arbiter of truth is whether the exploit actually worked, not a model vote.**
+layer. The real risks — prompt injection, memory poisoning, sandbox escape, tool/action abuse,
+poisoned skills — need an adversary.
 
-This repo is the toolkit. The write-ups, playbook, and field notes live at
-[trust-shell.com](https://trust-shell.com).
+**What TrustShell delivers is a credible verdict:** an AI-driven red-team that confirms what's
+actually exploitable, **refutes** what isn't, and holds its own findings to the same bar — we
+retract our own errors ([see how](field-notes/owasp-agentic-skills-in-practice.md)). The arbiter of
+truth is whether the exploit actually worked, not a model vote. That honesty is the point: a verdict
+a buyer, integrator, or insurer can act on is one whose author says "actually, no" when it's true.
+
+**This repository is the open method** — the toolkit and playbook we red-team with. The engagements,
+the verdicts, and the write-ups live at [trust-shell.com](https://trust-shell.com).
+
+## Field notes
+- [The scanner said safe. The exploit disagreed.](field-notes/owasp-agentic-skills-in-practice.md) —
+  OWASP Agentic Skills Top 10 in practice: two confirmed findings, and the two times we corrected our
+  own. Exploit-validated, target anonymized.
 
 ## What's here
 
