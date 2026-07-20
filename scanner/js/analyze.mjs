@@ -37,6 +37,10 @@ const GUARD_NAME = ["filter", "sanitiz", "scan", "guard", "block", "threat", "de
 const MEMORY_FN = ["memory", "remember", "curate", "persist", "profile"];
 const PROMPT_FN = ["prompt", "system", "instruction"];
 
+// Process-spawning APIs that are unambiguous by name (not resolved via imports)
+const KNOWN_PROC_CALLS = new Set(["Bun.spawn", "Bun.spawnSync", "Deno.Command", "Deno.run"]);
+const CHILD_PROCESS_MODULES = new Set(["child_process", "node:child_process"]);
+
 const SRC_EXT = [".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs"];
 const SKIP = ["/.git", "/node_modules", "/venv", "/.venv", "/__pycache__", "/dist", "/build", "/.next"];
 
@@ -68,6 +72,79 @@ const lastSeg = (dotted) => dotted.split(".").pop() || "";
 function lower(s) { return (s || "").toLowerCase(); }
 function anyHint(text, hints) { const t = lower(text); return hints.some((h) => t.includes(lower(h))); }
 
+/**
+ * Collect local identifiers actually bound to child_process, so we only flag real command
+ * execution. Without this, JS regex `.exec()` and Effect/session `.fork()` flood RT-3 with
+ * false positives — measured on a real 3k-file agent codebase.
+ */
+function collectProcessBindings(sf) {
+  const names = new Set();
+  const visit = (node) => {
+    // import cp from "child_process" / * as cp / { exec, spawn as sp }
+    if (ts.isImportDeclaration(node) && node.moduleSpecifier && ts.isStringLiteral(node.moduleSpecifier)
+        && CHILD_PROCESS_MODULES.has(node.moduleSpecifier.text)) {
+      const c = node.importClause;
+      if (c) {
+        if (c.name) names.add(c.name.text);
+        if (c.namedBindings) {
+          if (ts.isNamespaceImport(c.namedBindings)) names.add(c.namedBindings.name.text);
+          else for (const el of c.namedBindings.elements) names.add(el.name.text);
+        }
+      }
+    }
+    // const cp = require("child_process") / const { exec } = require("child_process")
+    if (ts.isVariableDeclaration(node) && node.initializer && ts.isCallExpression(node.initializer)
+        && calleeName(node.initializer.expression) === "require"
+        && node.initializer.arguments.length && ts.isStringLiteral(node.initializer.arguments[0])
+        && CHILD_PROCESS_MODULES.has(node.initializer.arguments[0].text)) {
+      if (ts.isIdentifier(node.name)) names.add(node.name.text);
+      else if (ts.isObjectBindingPattern(node.name))
+        for (const el of node.name.elements) if (ts.isIdentifier(el.name)) names.add(el.name.text);
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(sf);
+  return names;
+}
+
+/** A function that renders JSX is a UI component, not a prompt-construction sink. */
+function rendersJsx(fnNode) {
+  let found = false;
+  const scan = (n) => {
+    if (found) return;
+    if (ts.isJsxElement(n) || ts.isJsxSelfClosingElement(n) || ts.isJsxFragment(n)) { found = true; return; }
+    ts.forEachChild(n, scan);
+  };
+  if (fnNode.body) scan(fnNode.body);
+  return found;
+}
+
+/**
+ * Does this function actually interpolate untrusted input INTO a string? Name matching alone
+ * flags every UI component called `*Prompt*`; requiring real interpolation is what makes RT-1
+ * a signal instead of noise.
+ */
+function interpolatesUntrusted(fnNode, sf) {
+  let found = false;
+  const scan = (n) => {
+    if (found) return;
+    if (ts.isTemplateExpression(n)) {
+      for (const span of n.templateSpans)
+        if (anyHint(span.expression.getText(sf), UNTRUSTED_HINTS)) { found = true; return; }
+    }
+    if (ts.isBinaryExpression(n) && n.operatorToken.kind === ts.SyntaxKind.PlusToken) {
+      const stringish = ts.isStringLiteral(n.left) || ts.isStringLiteral(n.right)
+        || ts.isTemplateExpression(n.left) || ts.isTemplateExpression(n.right);
+      if (stringish && (anyHint(n.left.getText(sf), UNTRUSTED_HINTS) || anyHint(n.right.getText(sf), UNTRUSTED_HINTS))) {
+        found = true; return;
+      }
+    }
+    ts.forEachChild(n, scan);
+  };
+  if (fnNode.body) scan(fnNode.body);
+  return found;
+}
+
 function analyzeFile(absPath, root, out) {
   let srcText;
   try { srcText = fs.readFileSync(absPath, "utf8"); } catch { return; }
@@ -78,6 +155,7 @@ function analyzeFile(absPath, root, out) {
       absPath.endsWith(".tsx") || absPath.endsWith(".jsx") ? ts.ScriptKind.TSX : undefined);
   } catch { return; }
 
+  const procNames = collectProcessBindings(sf);   // identifiers actually bound to child_process
   const lineOf = (node) => sf.getLineAndCharacterOfPosition(node.getStart(sf)).line + 1;
   const snippet = (node) => {
     const ln = lineOf(node);
@@ -104,9 +182,14 @@ function analyzeFile(absPath, root, out) {
   function visitCall(node) {
     const dotted = calleeName(node.expression);
     const leaf = lastSeg(dotted);
+    const rootId = dotted.split(".")[0];
 
-    // RT-3: command execution / dynamic eval
-    if (EXEC_METHODS.has(leaf)) {
+    // RT-3: command execution — resolved via imports, NOT bare method names.
+    // `/re/.exec(s)` and `Scope.fork()` must not count as command execution.
+    const isRealProcCall =
+      (EXEC_METHODS.has(leaf) && (procNames.has(rootId) || procNames.has(dotted))) ||
+      KNOWN_PROC_CALLS.has(dotted);
+    if (isRealProcCall) {
       const argText = node.arguments.map((a) => a.getText(sf)).join(", ");
       const sev = /shell\s*:\s*true/.test(argText) ? "crit" : "high";
       add("RT-3", sev, node, `command execution ${dotted}() — candidate: do tools run un-isolated? confirm the sandbox dynamically`);
@@ -150,8 +233,10 @@ function analyzeFile(absPath, root, out) {
     if (GUARD_NAME.some((h) => lname.includes(h)) && /\.(test|match|exec|replace)\(|new RegExp|includes\(|indexOf\(/.test(body))
       add("RT-GUARD", "high", node, `function ${name}() appears to block by signature/keyword — candidate: a semantic injection (disguised as benign content) may bypass it`);
 
-    if (PROMPT_FN.some((h) => lname.includes(h)) && anyHint(body, UNTRUSTED_HINTS) && /`|\+/.test(body))
-      add("RT-1", "high", node, `function ${name}() appears to concatenate external content into a prompt/instruction — candidate: prompt injection`);
+    // RT-1: name match alone flags every UI component called *Prompt*; require that untrusted
+    // input is ACTUALLY interpolated into a string.
+    if (PROMPT_FN.some((h) => lname.includes(h)) && !rendersJsx(node) && interpolatesUntrusted(node, sf))
+      add("RT-1", "high", node, `function ${name}() interpolates external content into a prompt/instruction — candidate: prompt injection`);
   }
 
   function visit(node) {
