@@ -30,7 +30,7 @@ no real credentials, harmless markers, no destruction, responsible disclosure. O
    - **Refuted:** a static candidate the dynamic pass couldn't exploit — kill it out loud. A
      false positive dies to a real attack, not a model vote.
 4. **Grade & report.** Each finding carries both the code path and a working exploit, with
-   reproduction. Be fair: note the defenses that held. Disclose privately with fixes.
+   reproduction. Be fair: note the defenses that held. Disclose to help defenders — the finding and fix, not a weaponized payload.
 
 ## Why both
 A pure code verifier can only guess whether a flaw is real, so it leans on model voting to

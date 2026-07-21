@@ -71,8 +71,10 @@ call the whole toolkit (`static_scan`, `red_team`, `list_skills`) as native tool
    control. No destructive actions, no data exfiltration, no persistence beyond the test.
 5. **Method, not weapons.** These describe *how to test and confirm*, not ready-to-fire
    malicious payloads. Keep it that way when you extend them.
-6. **Responsible disclosure.** Report confirmed findings to the vendor privately first, with
-   reproduction and a fix. Be fair: if an agent defends well, say so.
+6. **Disclose to help defenders, not attackers.** Publish the finding, impact, and fix — **never a
+   copy-paste weaponized payload.** Choose your disclosure model (coordinated vendor-first, or full
+   public) deliberately. Be fair: if an agent defends well, say so; and report a **measured hit-rate**
+   (e.g. 5/8), never round a probabilistic break up to "always."
 
 ## The arbiter of truth
 

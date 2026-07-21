@@ -78,7 +78,7 @@ Trace every place external, attacker-influenced data enters, and follow it to a 
 Per finding: the untrusted **source**, the **sink**, the **missing check**, whether it's
 code-confirmed or live-fired, the **reachability conditions** (which channel/mode enabled), the
 concrete **impact chain**, and the **fix** (the exact sanitizer/ordering/fail-closed change).
-Disclose privately to the vendor before any named publication.
+Disclose to help defenders — the finding and fix, not a weaponized payload; pick your disclosure model deliberately.
 
 ## Related
 Behavioral / LLM-layer red-team: [`redteam-an-agent`](../redteam-an-agent/SKILL.md). Supply chain of
