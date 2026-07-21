@@ -24,17 +24,26 @@ code — one that only subverts the agent in plain English — passes as `safe, 
 **Fix:** gate on the command's actual effect, not its phrasing; treat processed content as data, never
 instruction; scan skills for semantic intent, not just signatures.
 
-## Case B — the framework layer · `CONFIRMED (in code); not live-fired`
+## Case B — the framework layer · `CONFIRMED (live — arbitrary write outside the sandbox)`
 **Class: unauthenticated path traversal → arbitrary file write.**
 This agent's LLM refused *everything* we sent it. So we audited its code. In one chat channel's
 attachment handler, the inbound `fileName` (attacker-controlled) is written as `download_dir / filename`
 with **no sanitization** — and the download happens during message *parsing*, **before** the agent's
 sender-approval gate. An unapproved stranger sends a file named `../../../../<config path>` and the
 agent writes their bytes there. It bypasses both the LLM and the auth.
+**We then live-fired it** (disposable cloud sandbox, latest source). We drove the framework's own
+*unmodified* download handler with an attacker `fileName` of `../`×12 + a marker path — stubbing only
+the vendor's file-transport, exactly what an inbound file message triggers. The agent's own logger
+recorded the write, and the marker landed **outside** the channel's media directory, in a
+world-writable path. Then we proved the fix: the `safe_filename` helper the *other* channels already
+call rewrites `../` to `.._`, and the same payload stays boxed inside the media dir. Marker was random
+and harmless; deleted after.
 The tell: **every other channel in the same codebase ran the filename through a sanitizer — exactly one
-forgot.** (We checked; it was not systemic — four channels were safe, one was not. Report the one.)
+forgot** — and the project even ships a regression test for `../../../etc/passwd` on a *different*
+channel. (We checked; it was not systemic — the sibling channels were safe, one was not. Report the one.)
 **Impact:** overwrite the config → point the model at an attacker endpoint (MITM every prompt, steal the
-key); or plant a startup file → RCE.
+key); or plant a startup file → RCE. We confirmed the arbitrary write; we did not weaponize past the
+marker.
 **Fix:** apply the same `safe_filename` helper the other channels already use; run auth before any
 file write.
 
